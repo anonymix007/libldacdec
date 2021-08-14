@@ -6,6 +6,7 @@
 
 #include "log.h"
 #include "imdct.h"
+#include "libldacBT_dec.h"
 
 #define container_of( ptr, type, member ) ({                \
         const typeof( ((type*)0)->member ) *__mptr = (ptr); \
@@ -77,7 +78,8 @@ typedef struct {
 } ldacdec_t;
 
 int ldacdecInit( ldacdec_t *this );
-int ldacDecode( ldacdec_t *this, uint8_t *stream, int16_t *pcm, int *bytesUsed );
+int ldacDecode( ldacdec_t *this, uint8_t *stream, short *pcm, int *bytesUsed );
+int ldacDecode_type( ldacdec_t *this, uint8_t *stream, void *pcm, int *bytesUsed, LDACBT_SMPL_FMT_T fmt );
 int ldacNullPacket( ldacdec_t *this, uint8_t *output, int *bytesUsed );
 int ldacdecGetSampleRate( ldacdec_t *this );
 int ldacdecGetChannelCount( ldacdec_t *this );

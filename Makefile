@@ -40,12 +40,16 @@ mdct_imdct: LDLIBS += $(shell pkg-config sndfile --libs)
 #mdct_imdct: CFLAGS += -DSINGLE_PRECISION
 mdct_imdct: mdct_imdct.o ldaclib.o imdct.o
 
+install: libldacdec.so
+	ln -sf libldacdec.so libldacdec.so.1
+	cp -a libldacdec.so libldacdec.so.1 /usr/lib/
+	cp libldacBT_dec.h /usr/include/ldac/libldacBT_dec.h
 %.so:
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 .PHONY: clean
 clean:
-	rm -f *.d *.o ldacenc ldacdec libldacdec.so
+	rm -f *.d *.o ldacenc ldacdec libldacdec.so libldacdec.so.1
 
 -include *.d
 

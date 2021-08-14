@@ -9,6 +9,9 @@
 #include "huffCodes.h"
 #include "spectrum.h"
 #include "bit_allocation.h"
+#include "libldacBT_dec.h"
+
+#define clear_data_ldac(p, n)      memset((p), 0, (n))
 
 #define LDAC_SYNCWORDBITS   (8)
 #define LDAC_SYNCWORD       (0xAA)
@@ -404,6 +407,29 @@ static void pcmFloatToShort( frame_t *this, int16_t *pcmOut )
     }
 }
 
+static void pcmFloatToFloat( frame_t *this, float *pcmOut )
+{
+    int i=0;
+    for(int smpl=0; smpl<this->frameSamples; ++smpl )
+    {
+        for( int ch=0; ch<this->channelCount; ++ch, ++i )
+        {
+            pcmOut[i] = this->channels[ch].pcm[smpl];
+        }
+    }
+}
+
+static void pcmFloatToInt( frame_t *this, int32_t *pcmOut )
+{
+    int i=0;
+    for(int smpl=0; smpl<this->frameSamples; ++smpl )
+    {
+        for( int ch=0; ch<this->channelCount; ++ch, ++i )
+        {
+            pcmOut[i] = Round(this->channels[ch].pcm[smpl]);
+        }
+    }
+}
 static const int channelConfigIdToChannelCount[] = { 1, 2, 2 };
 
 int ldacdecGetChannelCount( ldacdec_t *this )
@@ -450,7 +476,7 @@ static int decodeFrame( frame_t *this, BitReaderCxt *br )
     return 0;
 }
 
-int ldacDecode( ldacdec_t *this, uint8_t *stream, int16_t *pcm, int *bytesUsed )
+int ldacDecode( ldacdec_t *this, uint8_t *stream, short *pcm, int *bytesUsed )
 {
     BitReaderCxt brObject;
     BitReaderCxt *br = &brObject;
@@ -493,6 +519,61 @@ int ldacDecode( ldacdec_t *this, uint8_t *stream, int16_t *pcm, int *bytesUsed )
     return 0;
 }
 
+int ldacDecode_type( ldacdec_t *this, uint8_t *stream, void *pcm, int *bytesUsed, LDACBT_SMPL_FMT_T fmt)
+{
+    BitReaderCxt brObject;
+    BitReaderCxt *br = &brObject;
+    InitBitReaderCxt( br, stream );
+
+    frame_t *frame = &this->frame;
+   
+    int ret = decodeFrame( frame, br );
+    if( ret < 0 )
+        return -1;
+   
+    for( int block = 0; block<gaa_block_setting_ldac[frame->channelConfigId][1]; ++block )
+    {
+        decodeBand( frame, br );
+        decodeGradient( frame, br );
+        calculateGradient( frame );
+        
+        for( int i=0; i<frame->channelCount; ++i )
+        {
+            channel_t *channel = &frame->channels[i];
+            decodeScaleFactors( frame, br, i );
+            calculatePrecisionMask( channel ); 
+            calculatePrecisions( channel );
+
+            decodeSpectrum( channel, br );
+            decodeSpectrumFine( channel, br );
+            dequantizeSpectra( channel );
+            scaleSpectrum( channel );
+
+            RunImdct( &channel->mdct, channel->spectra, channel->pcm );
+        }
+        AlignPosition( br, 8 );
+
+        switch(fmt){
+            case LDACBT_SMPL_FMT_F32:
+                pcmFloatToFloat( frame, pcm );
+                break;
+            case LDACBT_SMPL_FMT_S32:
+                pcmFloatToInt( frame, pcm );
+                break;
+            case LDACBT_SMPL_FMT_S16:
+                pcmFloatToShort( frame, pcm);
+                break;
+            default: return 666;
+        }
+        
+    }
+    AlignPosition( br, (frame->frameLength)*8 + 24 );
+
+    if( bytesUsed != NULL )
+        *bytesUsed = br->Position / 8;
+    return 0;
+}
+
 // for packet loss concealment
 static const int sa_null_data_size_ldac[2] = {
     11, 15,
@@ -517,4 +598,79 @@ int ldacNullPacket( ldacdec_t *this, uint8_t *output, int *bytesUsed )
     }
 
     *bytesUsed = frame->frameLength + 3;
+
+    return 0;
+}
+
+void ldacBT_free_handle(HANDLE_LDAC_BT hLdacBT)
+{
+    if(hLdacBT == NULL) return;
+
+    if(hLdacBT->hLDAC != NULL) free(hLdacBT->hLDAC);
+
+    free(hLdacBT);
+}
+
+HANDLE_LDAC_BT ldacBT_get_handle(void)
+{
+    HANDLE_LDAC_BT hLdacBT;
+
+    hLdacBT = (HANDLE_LDAC_BT)malloc(sizeof(_st_ldacbt_handle));
+    if( hLdacBT == NULL )return NULL;
+    
+    ldacdec_t *dec = malloc(sizeof(ldacdec_t));
+    
+    /* Get ldaclib Handler */
+    if((hLdacBT->hLDAC = (HANDLE_LDAC)dec) == NULL){
+        free(hLdacBT);
+        return NULL;
+    }
+
+    hLdacBT->proc_mode = LDACBT_PROCMODE_DECODE;
+    
+    return hLdacBT;
+}
+
+int ldacBT_init_handle_decode(HANDLE_LDAC_BT hLdacBT, int cm, int sf, int nshift, int var1, int var2){
+    (void)cm;
+    (void)sf;
+    (void)nshift;
+    (void)var1;
+    (void)var2;
+
+    if(hLdacBT->proc_mode != LDACBT_PROCMODE_DECODE) return 1000;
+
+    return ldacdecInit((ldacdec_t *)hLdacBT->hLDAC);
+}
+
+int ldacBT_decode(HANDLE_LDAC_BT hLdacBT, uchar *p_stream, void *p_pcm, LDACBT_SMPL_FMT_T fmt, int stream_sz, int *used_bytes, int *pcm_sz){
+    (void)stream_sz;
+    ldacdec_t *dec = (ldacdec_t *)hLdacBT->hLDAC;
+    
+    FILE *fp = fopen("/tmp/ldac.dat","ab");	
+    FILE *raw = fopen("/tmp/ldac.pcm","ab");	
+    if(fp==NULL){
+        fp=fopen("/tmp/ldac.dat","wb");	
+    }
+    if(raw==NULL){
+        fp=fopen("/tmp/ldac.pcm","wb");	
+    }    
+    fwrite(p_stream, 1, stream_sz, fp);
+    
+    printf("LIBLDACDEC: Format: %d, ", fmt);
+    
+    if(fmt != LDACBT_SMPL_FMT_S16 && fmt != LDACBT_SMPL_FMT_S32 && fmt != LDACBT_SMPL_FMT_F32) return hLdacBT->error_code_api=517;
+    
+    if(hLdacBT->proc_mode != LDACBT_PROCMODE_DECODE) return hLdacBT->error_code_api=1000
+
+    int result = ldacDecode_type(dec, p_stream, p_pcm, used_bytes, fmt); 
+    *pcm_sz = dec->frame.frameSamples;
+    printf("decode result: %d, frameSamples: %d\n", result, dec->frame.frameSamples);
+    if(result == -1) return hLdacBT->error_code_api=516;
+    
+    fwrite(p_pcm, 1, dec->frame.frameSamples, raw);
+    
+    fclose(fp);
+    fclose(raw);
+    return  hLdacBT->error_code_api=result;
 }
