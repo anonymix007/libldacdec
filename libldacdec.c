@@ -451,6 +451,7 @@ int ldacdecGetSampleRate( ldacdec_t *this )
 static int decodeFrame( frame_t *this, BitReaderCxt *br )
 {
     int syncWord = ReadInt( br, LDAC_SYNCWORDBITS );
+    printf("LDACDEC: syncword: %x\n",syncWord);
     if( syncWord != LDAC_SYNCWORD )
         return -1;
 
@@ -661,11 +662,11 @@ int ldacBT_decode(HANDLE_LDAC_BT hLdacBT, uchar *p_stream, void *p_pcm, LDACBT_S
     
     if(fmt != LDACBT_SMPL_FMT_S16 && fmt != LDACBT_SMPL_FMT_S32 && fmt != LDACBT_SMPL_FMT_F32) return hLdacBT->error_code_api=517;
     
-    if(hLdacBT->proc_mode != LDACBT_PROCMODE_DECODE) return hLdacBT->error_code_api=1000
+    if(hLdacBT->proc_mode != LDACBT_PROCMODE_DECODE) return hLdacBT->error_code_api=1000;
 
     int result = ldacDecode_type(dec, p_stream, p_pcm, used_bytes, fmt); 
     *pcm_sz = dec->frame.frameSamples;
-    printf("decode result: %d, frameSamples: %d\n", result, dec->frame.frameSamples);
+    printf("result: %d, pcm_sz: %d, stream_sz: %d, used_bytes: %d\n", result, dec->frame.frameSamples, stream_sz, *used_bytes);
     if(result == -1) return hLdacBT->error_code_api=516;
     
     fwrite(p_pcm, 1, dec->frame.frameSamples, raw);
