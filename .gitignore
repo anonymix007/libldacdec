@@ -3,3 +3,4 @@ ldacenc
 *.o
 *.d
 *.so
+*.so.1
