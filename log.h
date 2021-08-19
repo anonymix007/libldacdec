@@ -46,6 +46,19 @@
 
 #endif
 
+#ifdef DEBUG_ADAPTATION
+
+#define LOG_ADAPT( format, ... ) \
+{   \
+    printf( format, __VA_ARGS__ );  \
+}    
+
+#else
+
+#define LOG_ADAPT( format, ... )
+
+#endif
+
 
 #endif // __LOG_H_
 

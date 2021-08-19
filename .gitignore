@@ -7,3 +7,4 @@ ldacenc
 *.d
 *.so
 *.so.1
+*.dump

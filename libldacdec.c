@@ -259,7 +259,7 @@ static void calculatePrecisions( channel_t *this )
                 break;
             }
             default:
-                printf("Gradient mode: %d\n",frame->gradientMode);
+                LOG("Gradient mode: %d\n",frame->gradientMode);
                 //assert(0);
                 break;
         }
@@ -452,7 +452,9 @@ int ldacdecGetSampleRate( ldacdec_t *this )
 static int decodeFrame( frame_t *this, BitReaderCxt *br )
 {
     int syncWord = ReadInt( br, LDAC_SYNCWORDBITS );
-    //printf("LDACDEC: syncword: %x\n",syncWord);
+    
+    LOG_ADAPT("syncWord: %d, ", syncWord);
+    
     if( syncWord != LDAC_SYNCWORD )
         return -1;
 
@@ -649,30 +651,18 @@ int ldacBT_decode(HANDLE_LDAC_BT hLdacBT, uchar *p_stream, void *p_pcm, LDACBT_S
     (void)stream_sz;
     ldacdec_t *dec = (ldacdec_t *)hLdacBT->hLDAC;
     
-    FILE *fp = fopen("/tmp/ldac.dat","ab");	
-    FILE *raw = fopen("/tmp/ldac.pcm","ab");	
-    if(fp==NULL){
-        fp=fopen("/tmp/ldac.dat","wb");	
-    }
-    if(raw==NULL){
-        fp=fopen("/tmp/ldac.pcm","wb");	
-    }    
-    fwrite(p_stream, 1, stream_sz, fp);
-    
-    printf("LIBLDACDEC: Format: %d, ", fmt);
+    LOG_ADAPT("LIBLDACDEC: Format: %d, ", fmt);
     
     if(fmt != LDACBT_SMPL_FMT_S16 && fmt != LDACBT_SMPL_FMT_S32 && fmt != LDACBT_SMPL_FMT_F32) return hLdacBT->error_code_api=517;
     
     if(hLdacBT->proc_mode != LDACBT_PROCMODE_DECODE) return hLdacBT->error_code_api=1000;
 
     int result = ldacDecode_type(dec, p_stream, p_pcm, used_bytes, fmt); 
+    
     *pcm_sz = dec->frame.frameSamples * (fmt < 5 ? fmt : 4);
-    printf("result: %d, pcm_sz: %d, stream_sz: %d, used_bytes: %d\n", result, dec->frame.frameSamples, stream_sz, *used_bytes);
+    LOG_ADAPT("result: %d, pcm_sz: %d, stream_sz: %d, used_bytes: %d\n", result, *pcm_sz, stream_sz, *used_bytes);
     if(result == -1) return hLdacBT->error_code_api=516;
     
-    fwrite(p_pcm, 1, dec->frame.frameSamples, raw);
-    
-    fclose(fp);
-    fclose(raw);
+
     return  hLdacBT->error_code_api=result;
 }

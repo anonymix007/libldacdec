@@ -65,7 +65,7 @@ int main(int argc, char *args[] )
     uint8_t *ptr = NULL;
     int16_t pcm[PCM_BUFFER_SIZE] = { 0 };
     size_t filePosition = 0;
-    int blockId = 0;
+    //int blockId = 0;
     int bytesInBuffer = 0;
     while(1)
     {

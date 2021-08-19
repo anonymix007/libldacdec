@@ -11,6 +11,7 @@ CFLAGS += -std=gnu11
 CFLAGS += -Wall -Wextra
 CFLAGS += -Ilibldac/inc -Ilibldac/src
 #CFLAGS += -DDEBUG
+CFLAGS += -DDEBUG_ADAPTATION
 LDLIBS = -lm
 
 ifeq ($(ASAN),true)
