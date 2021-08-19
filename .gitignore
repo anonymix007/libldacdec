@@ -1,5 +1,8 @@
 ldacdec
 ldacenc
+*.ldac
+*.wav
+*.dat
 *.o
 *.d
 *.so

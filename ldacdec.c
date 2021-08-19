@@ -16,7 +16,7 @@ SNDFILE *openAudioFile( const char *fileName, int freq, int channels )
     SF_INFO sfinfo = { 
         .samplerate = freq, 
         .channels = channels,
-        .format = SF_FORMAT_WAV | SF_FORMAT_PCM_16,
+        .format = SF_FORMAT_WAV | SF_FORMAT_PCM_24,
     };
     printf("opening \"%s\" for writing ...\n", fileName );
     printf("sampling frequency: %d\n", freq );

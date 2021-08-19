@@ -21,7 +21,7 @@ endif
 VPATH += libldac/src/
 LDFLAGS += -L.
 
-all: ldacdec ldacenc
+all: libldacdec.so ldacdec ldacenc
 
 libldacdec.so: LDFLAGS += -shared -fpic -Wl,-soname,libldacdec.so.1
 libldacdec.so: CFLAGS += -fpic
@@ -32,7 +32,7 @@ ldacenc: ldacenc.o ldaclib.o ldacBT.o
 ldacenc: LDLIBS += $(shell pkg-config sndfile --libs) $(shell pkg-config samplerate --libs)
 ldacenc: ldacenc.o ldaclib.o ldacBT.o
 
-ldacdec: ldacdec.o libldacdec.so
+ldacdec: libldacdec.so ldacdec.o
 ldacdec: LDFLAGS += -Wl,-rpath=.
 ldacdec: LDLIBS += -lldacdec -lsndfile
 

@@ -259,7 +259,8 @@ static void calculatePrecisions( channel_t *this )
                 break;
             }
             default:
-                assert(0);
+                printf("Gradient mode: %d\n",frame->gradientMode);
+                //assert(0);
                 break;
         }
     }
@@ -414,7 +415,7 @@ static void pcmFloatToFloat( frame_t *this, float *pcmOut )
     {
         for( int ch=0; ch<this->channelCount; ++ch, ++i )
         {
-            pcmOut[i] = this->channels[ch].pcm[smpl];
+            pcmOut[i] = this->channels[ch].pcm[smpl]/(1<<15);
         }
     }
 }
@@ -426,7 +427,7 @@ static void pcmFloatToInt( frame_t *this, int32_t *pcmOut )
     {
         for( int ch=0; ch<this->channelCount; ++ch, ++i )
         {
-            pcmOut[i] = Round(this->channels[ch].pcm[smpl]);
+            pcmOut[i] = Round(this->channels[ch].pcm[smpl]*(1<<15));
         }
     }
 }
@@ -451,7 +452,7 @@ int ldacdecGetSampleRate( ldacdec_t *this )
 static int decodeFrame( frame_t *this, BitReaderCxt *br )
 {
     int syncWord = ReadInt( br, LDAC_SYNCWORDBITS );
-    printf("LDACDEC: syncword: %x\n",syncWord);
+    //printf("LDACDEC: syncword: %x\n",syncWord);
     if( syncWord != LDAC_SYNCWORD )
         return -1;
 
@@ -665,7 +666,7 @@ int ldacBT_decode(HANDLE_LDAC_BT hLdacBT, uchar *p_stream, void *p_pcm, LDACBT_S
     if(hLdacBT->proc_mode != LDACBT_PROCMODE_DECODE) return hLdacBT->error_code_api=1000;
 
     int result = ldacDecode_type(dec, p_stream, p_pcm, used_bytes, fmt); 
-    *pcm_sz = dec->frame.frameSamples;
+    *pcm_sz = dec->frame.frameSamples * (fmt < 5 ? fmt : 4);
     printf("result: %d, pcm_sz: %d, stream_sz: %d, used_bytes: %d\n", result, dec->frame.frameSamples, stream_sz, *used_bytes);
     if(result == -1) return hLdacBT->error_code_api=516;
     
