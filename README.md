@@ -7,6 +7,7 @@ LDAC is basically a stripped down, streaming only ATRAC9.
 
 #### Build
 ```sh
+sudo apt install libsndfile1 libsndfile1-dev libsamplerate0 libsamplerate0-dev
 make libldacdec.so
 sudo make install
 
