@@ -1,13 +1,14 @@
 #pragma once
+#include "utility.h"
 
 typedef struct {
 	int Bits;
 	int Size;
-	double Scale;
-	double ImdctPrevious[MAX_FRAME_SAMPLES];
-	double* Window;
-	double* SinTable;
-	double* CosTable;
+	scalar Scale;
+	scalar ImdctPrevious[MAX_FRAME_SAMPLES];
+	scalar* Window;
+	scalar* SinTable;
+	scalar* CosTable;
 } Mdct;
 
 void InitMdct();
