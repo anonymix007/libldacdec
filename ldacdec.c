@@ -5,7 +5,7 @@
 #include <math.h>
 #include <float.h>
 #include <string.h>
-
+#include <errno.h>
 
 #include "ldacdec.h"
 
@@ -31,8 +31,8 @@ SNDFILE *openAudioFile( const char *fileName, int freq, int channels )
 }
 
 
-#define BUFFER_SIZE (680*2)
-#define PCM_BUFFER_SIZE (256*2)
+#define BUFFER_SIZE (680*2*2)
+#define PCM_BUFFER_SIZE (256*2*2)
 
 int main(int argc, char *args[] )
 {
@@ -63,7 +63,7 @@ int main(int argc, char *args[] )
 
     uint8_t buf[BUFFER_SIZE];
     uint8_t *ptr = NULL;
-    int16_t pcm[PCM_BUFFER_SIZE] = { 0 };
+    int32_t pcm[PCM_BUFFER_SIZE] = { 0 };
     size_t filePosition = 0;
     //int blockId = 0;
     int bytesInBuffer = 0;
@@ -74,11 +74,13 @@ int main(int argc, char *args[] )
         if( ret < 0 )
             break;
         bytesInBuffer = fread( buf, 1, BUFFER_SIZE, in );
+        
         ptr = buf;
-        if( bytesInBuffer == 0 )
+        if( bytesInBuffer == 0 ){
             break;
+        }
 #if 1
-        if(ptr[1] == 0xAA) 
+        while(ptr[0] != 0xAA) 
         {
             ptr++;
             filePosition++;
@@ -89,9 +91,10 @@ int main(int argc, char *args[] )
       
         memset( pcm, 0, sizeof(pcm) );
         LOG("count === %4d ===\n", blockId++ );
-        ret = ldacDecode( &dec, ptr, pcm, &bytesUsed ); 
-        if( ret < 0 )
+        ret = ldacDecode_type( &dec, ptr, pcm, &bytesUsed, 4); 
+        if( ret < 0 ){
             break;
+        }
         LOG_ARRAY( pcm, "%4d, " );
         if( out == NULL )
         {
@@ -101,13 +104,14 @@ int main(int argc, char *args[] )
                 return EXIT_FAILURE;
         }
 
-        sf_writef_short( out, pcm, dec.frame.frameSamples );
+        sf_writef_int( out, pcm, dec.frame.frameSamples );
         filePosition += bytesUsed;
+        fflush(stdout);
     }
 
-    printf("done.\n");
+    printf("Done!\n");
 
-    sf_close( out );
+    sf_close(out);
     fclose(in);
 
     return EXIT_SUCCESS;
