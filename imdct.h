@@ -4,7 +4,7 @@
 typedef struct {
 	int Bits;
 	int Size;
-	scalar Scale;
+//	scalar Scale;
 	scalar ImdctPrevious[MAX_FRAME_SAMPLES];
 	scalar* Window;
 	scalar* SinTable;
@@ -12,5 +12,5 @@ typedef struct {
 } Mdct;
 
 void InitMdct();
-void RunImdct(Mdct* mdct, float* input, float* output);
+void RunImdct(Mdct* mdct, scalar* input, scalar* output);
 

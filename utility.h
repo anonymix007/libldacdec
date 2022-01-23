@@ -10,11 +10,17 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+#ifdef __x86_64__    
+typedef int int32;
+typedef long long int64;
+#endif    
+
 #if defined(DOUBLE64)
 typedef double scalar;
 #elif defined(FIXEDPOINT)
-#include <stdfix.h>
-typedef fract scalar;
+#include "fixp_ldac.h"
+
+typedef int scalar;
 #else
 typedef float scalar;
 #endif

@@ -12,8 +12,8 @@ CFLAGS += -Wall -Wextra
 CFLAGS += -Ilibldac/inc -Ilibldac/src
 #CFLAGS += -DDEBUG
 #CFLAGS += -DDEBUG_ADAPTATION
-CFLAGS += -DDOUBLE64
-LDLIBS = -lm
+CFLAGS += -DFIXEDPOINT
+LDLIBS = -lm -lfftw3f
 
 ifeq ($(ASAN),true)
 LCFLAGS += -fsanitize=address
@@ -27,7 +27,7 @@ all: libldacdec.so ldacdec ldacenc
 
 libldacdec.so: LDFLAGS += -shared -fpic -Wl,-soname,libldacdec.so.1
 libldacdec.so: CFLAGS += -fpic
-libldacdec.so: libldacdec.o bit_allocation.o huffCodes.o bit_reader.o utility.o imdct.o spectrum.o
+libldacdec.so: fixp_func.o libldacdec.o bit_allocation.o huffCodes.o bit_reader.o utility.o imdct.o spectrum.o
 
 ldacenc: ldacenc.o ldaclib.o ldacBT.o
 

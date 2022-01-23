@@ -60,13 +60,17 @@ int main(int argc, char *args[] )
     }
 
     SNDFILE *out = NULL;
-
+    printf("auto detect format!\n");
+    out = openAudioFile(audioFile, 96000, 2); 
+    if(out == NULL) return EXIT_FAILURE;
     uint8_t buf[BUFFER_SIZE];
     uint8_t *ptr = NULL;
     int32_t pcm[PCM_BUFFER_SIZE] = { 0 };
     size_t filePosition = 0;
     //int blockId = 0;
     int bytesInBuffer = 0;
+    unsigned long long i = 0;
+
     while(1)
     {
         LOG("%ld =>\n", filePosition );
@@ -86,30 +90,25 @@ int main(int argc, char *args[] )
             filePosition++;
         }
 #endif        
-        LOG("sync: %02x\n", ptr[0] );
+        //printf("sync: %02x,\tpos %4lx,\t", ptr[0], filePosition);
         int bytesUsed = 0;
       
         memset( pcm, 0, sizeof(pcm) );
         LOG("count === %4d ===\n", blockId++ );
-        ret = ldacDecode_type( &dec, ptr, pcm, &bytesUsed, 4); 
-        if( ret < 0 ){
-            break;
-        }
+        ret = ldacDecode_type( &dec, ptr, pcm, &bytesUsed, 4);
+        //printf("ret %d,\tused %d\n", ret, bytesUsed); 
+
         LOG_ARRAY( pcm, "%4d, " );
-        if( out == NULL )
-        {
-            printf("auto detect format!\n");
-            out = openAudioFile( audioFile, ldacdecGetSampleRate( &dec ), ldacdecGetChannelCount( &dec ) ); 
-            if( out == NULL )
-                return EXIT_FAILURE;
-        }
 
         sf_writef_int( out, pcm, dec.frame.frameSamples );
         filePosition += bytesUsed;
-        fflush(stdout);
+        i++;
+        if( ret < 0 ){
+            break;
+        }        
     }
 
-    printf("Done!\n");
+    printf("%llu iterations\nDone!\n", i);
 
     sf_close(out);
     fclose(in);

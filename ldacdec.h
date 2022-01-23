@@ -42,8 +42,8 @@ struct Channel {
     int quantizedSpectra[MAX_FRAME_SAMPLES];
     int quantizedSpectraFine[MAX_FRAME_SAMPLES];
 
-    float spectra[MAX_FRAME_SAMPLES];
-    float pcm[MAX_FRAME_SAMPLES];
+    scalar spectra[MAX_FRAME_SAMPLES];
+    scalar pcm[MAX_FRAME_SAMPLES];
     Mdct mdct;
 };
 
@@ -78,7 +78,6 @@ typedef struct {
 } ldacdec_t;
 
 int ldacdecInit( ldacdec_t *this );
-int ldacDecode( ldacdec_t *this, uint8_t *stream, short *pcm, int *bytesUsed );
 int ldacDecode_type( ldacdec_t *this, uint8_t *stream, void *pcm, int *bytesUsed, LDACBT_SMPL_FMT_T fmt );
 int ldacNullPacket( ldacdec_t *this, uint8_t *output, int *bytesUsed );
 int ldacdecGetSampleRate( ldacdec_t *this );

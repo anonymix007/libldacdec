@@ -396,6 +396,7 @@ static const char gaa_block_setting_ldac[4][4]=
     {0, 0, 0},
 };
 
+#ifndef FIXEDPOINT
 static void pcmFloatToShort( frame_t *this, int16_t *pcmOut )
 {
     int i=0;
@@ -431,6 +432,43 @@ static void pcmFloatToInt( frame_t *this, int32_t *pcmOut )
         }
     }
 }
+#else
+static void pcmIntToShort( frame_t *this, int16_t *pcmOut )
+{
+    int i=0;
+    for(int smpl=0; smpl<this->frameSamples; ++smpl )
+    {
+        for( int ch=0; ch<this->channelCount; ++ch, ++i )
+        {
+            pcmOut[i] = this->channels[ch].pcm[smpl] >> 16;
+        }
+    }
+}
+
+static void pcmIntToFloat( frame_t *this, float *pcmOut )
+{
+    int i=0;
+    for(int smpl=0; smpl<this->frameSamples; ++smpl )
+    {
+        for( int ch=0; ch<this->channelCount; ++ch, ++i )
+        {
+            pcmOut[i] = this->channels[ch].pcm[smpl] / 2147483648.0;
+        }
+    }
+}
+
+static void pcmIntToInt( frame_t *this, int32_t *pcmOut )
+{
+    int i=0;
+    for(int smpl=0; smpl<this->frameSamples; ++smpl )
+    {
+        for( int ch=0; ch<this->channelCount; ++ch, ++i )
+        {
+            pcmOut[i] = this->channels[ch].pcm[smpl];
+        }
+    }
+}
+#endif
 static const int channelConfigIdToChannelCount[] = { 1, 2, 2 };
 
 int ldacdecGetChannelCount( ldacdec_t *this )
@@ -480,49 +518,6 @@ static int decodeFrame( frame_t *this, BitReaderCxt *br )
     return 0;
 }
 
-int ldacDecode( ldacdec_t *this, uint8_t *stream, short *pcm, int *bytesUsed )
-{
-    BitReaderCxt brObject;
-    BitReaderCxt *br = &brObject;
-    InitBitReaderCxt( br, stream );
-
-    frame_t *frame = &this->frame;
-
-    int ret = decodeFrame( frame, br );
-    if( ret < 0 )
-        return -1;
-
-    for( int block = 0; block<gaa_block_setting_ldac[frame->channelConfigId][1]; ++block )
-    {
-        decodeBand( frame, br );
-        decodeGradient( frame, br );
-        calculateGradient( frame );
-
-        for( int i=0; i<frame->channelCount; ++i )
-        {
-            channel_t *channel = &frame->channels[i];
-            decodeScaleFactors( frame, br, i );
-            calculatePrecisionMask( channel );
-            calculatePrecisions( channel );
-
-            decodeSpectrum( channel, br );
-            decodeSpectrumFine( channel, br );
-            dequantizeSpectra( channel );
-            scaleSpectrum( channel );
-
-            RunImdct( &channel->mdct, channel->spectra, channel->pcm );
-        }
-        AlignPosition( br, 8 );
-
-        pcmFloatToShort( frame, pcm );
-    }
-    AlignPosition( br, (frame->frameLength)*8 + 24 );
-
-    if( bytesUsed != NULL )
-        *bytesUsed = br->Position / 8;
-    return 0;
-}
-
 int ldacDecode_type( ldacdec_t *this, uint8_t *stream, void *pcm, int *bytesUsed, LDACBT_SMPL_FMT_T fmt)
 {
     BitReaderCxt brObject;
@@ -559,13 +554,13 @@ int ldacDecode_type( ldacdec_t *this, uint8_t *stream, void *pcm, int *bytesUsed
 
         switch(fmt){
             case LDACBT_SMPL_FMT_F32:
-                pcmFloatToFloat( frame, pcm );
+                pcmIntToFloat( frame, pcm );
                 break;
             case LDACBT_SMPL_FMT_S32:
-                pcmFloatToInt( frame, pcm );
+                pcmIntToInt( frame, pcm );
                 break;
             case LDACBT_SMPL_FMT_S16:
-                pcmFloatToShort( frame, pcm);
+                pcmIntToShort( frame, pcm);
                 break;
             default: return 666;
         }

@@ -2,10 +2,13 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-
+#include <float.h>
+#include <limits.h>
 #include "ldacdec.h"
 #include "spectrum.h"
 #include "log.h"
+#include "fixp_ldac.h"
+
 
 #define LDAC_MAXNQUS          34
 #define LDAC_MAXNSPS          16
@@ -75,21 +78,32 @@ static const int decode4DSpectrum[128] = {
     Quantization Tables
 ***************************************************************************************************/
 /* Inverse of Quantize Factor for Spectrum/Residual Quantization */
-static const float QuantizerStepSize[16] = {
+
+#ifndef FIXEDPOINT
+static const scalar QuantizerStepSize[16] = {
     2.0000000000000000e+00, 6.6666666666666663e-01, 2.8571428571428570e-01, 1.3333333333333333e-01,
     6.4516129032258063e-02, 3.1746031746031744e-02, 1.5748031496062992e-02, 7.8431372549019607e-03,
     3.9138943248532287e-03, 1.9550342130987292e-03, 9.7703957010258913e-04, 4.8840048840048840e-04,
     2.4417043096081065e-04, 1.2207776353537203e-04, 6.1037018951994385e-05, 3.0518043793392844e-05,
 };
 
-static const float QuantizerFineStepSize[16] =
+static const scalar QuantizerFineStepSize[16] =
 {
 	3.0518043793392844e-05, 1.0172681264464281e-05, 4.3597205419132631e-06, 2.0345362528928561e-06,
 	9.8445302559331759e-07, 4.8441339354591809e-07, 2.4029955742829012e-07, 1.1967860311134448e-07,
 	5.9722199204291275e-08, 2.9831909866464167e-08, 1.4908668194134265e-08, 7.4525137468602791e-09,
 	3.7258019525568114e-09, 1.8627872668859698e-09, 9.3136520869755679e-10, 4.6567549848772173e-10
 };
-
+#else
+static const scalar QuantizerStepSize[16] = {                   /* Q30 */
+    0x7fffffff, 0x2aaaaaab, 0x12492492, 0x08888889, 0x04210842, 0x02082082, 0x01020408, 0x00808081, 
+    0x00402010, 0x00200802, 0x00100200, 0x00080080, 0x00040020, 0x00020008, 0x00010002, 0x00008001, 
+};
+static const scalar QuantizerFineStepSize[16] = {                /* Q31 */
+    0x00010001, 0x00005556, 0x00002492, 0x00001111, 0x00000842, 0x00000410, 0x00000204, 0x00000101, 
+    0x00000080, 0x00000040, 0x00000020, 0x00000010, 0x00000008, 0x00000004, 0x00000002, 0x00000001, 
+};
+#endif
 
 int decodeSpectrum( channel_t *this, BitReaderCxt *br )
 {
@@ -153,12 +167,14 @@ int decodeSpectrumFine( channel_t *this, BitReaderCxt *br )
     return 0;
 }
 
+#ifndef FIXEDPOINT
 static void dequantizeQuantUnit( channel_t* this, int band )
 {
+    //static double d_min = DBL_MAX, d_max = DBL_MIN;
     const int subBandIndex = ga_isp_ldac[band];
     const int subBandCount = ga_nsps_ldac[band];
-    const float stepSize = QuantizerStepSize[this->precisions[band]];
-    const float stepSizeFine = QuantizerFineStepSize[this->precisions[band]];
+    const scalar stepSize = QuantizerStepSize[this->precisions[band]];
+    const scalar stepSizeFine = QuantizerFineStepSize[this->precisions[band]];
 
     for( int sb=0; sb<subBandCount; ++sb )
     {
@@ -167,6 +183,41 @@ static void dequantizeQuantUnit( channel_t* this, int band )
         this->spectra[subBandIndex + sb] = coarse + fine;
     }
 }
+#else
+static void dequantizeQuantUnit( channel_t* this, int band )
+{
+    static int imin1 = INT_MAX, imax1 = INT_MIN;
+    static int imin2 = INT_MAX, imax2 = INT_MIN;
+    static int imin3 = INT_MAX, imax3 = INT_MIN;
+    const int subBandIndex = ga_isp_ldac[band];
+    const int subBandCount = ga_nsps_ldac[band];
+    const scalar stepSize = QuantizerStepSize[this->precisions[band]];
+    const scalar stepSizeFine = QuantizerFineStepSize[this->precisions[band]];
+
+    for( int sb=0; sb<subBandCount; ++sb )
+    {
+        //Q31 <- Q00 * Q30
+        //Q31 <- Q00 * Q31
+        
+        const scalar coarse = mul_lsftrnd_ldac(this->quantizedSpectra[subBandIndex+sb], stepSize, -1);
+        const scalar fine = mul_lsftrnd_ldac(this->quantizedSpectraFine[subBandIndex+sb], stepSizeFine, 0);
+        imin1 = min(imin1, coarse);
+        imax1 = max(imax1, coarse);
+
+        imin2 = min(imin2, fine);
+        imax2 = max(imax2, fine);
+
+        this->spectra[subBandIndex + sb] = coarse + fine;
+
+        imin3 = min(imin3, this->spectra[subBandIndex + sb]);
+        imax3 = max(imax3, this->spectra[subBandIndex + sb]);
+    }
+    //TODO: Check if we need to fix the range 
+    //printf("ideq1[%d; %d]\n", imin1, imax1);
+    //printf("ideq2[%d; %d]\n", imin2, imax2);
+    //printf("ideq3[%d; %d]\n", imin3, imax3);
+}
+#endif
 
 void dequantizeSpectra( channel_t *this )
 {
@@ -182,6 +233,8 @@ void dequantizeSpectra( channel_t *this )
     LOG_ARRAY_LEN( this->spectra, "%e, ", ga_isp_ldac[frame->quantizationUnitCount-1] + ga_nsps_ldac[frame->quantizationUnitCount-1] ); 
 }
 
+
+#ifndef FIXEDPOINT
 static const scalar spectrumScale[32] =
 {
 	3.0517578125e-5, 6.1035156250e-5, 1.2207031250e-4, 2.4414062500e-4,
@@ -193,12 +246,22 @@ static const scalar spectrumScale[32] =
 	5.1200000000e+2, 1.0240000000e+3, 2.0480000000e+3, 4.0960000000e+3,
 	8.1920000000e+3, 1.6384000000e+4, 3.2768000000e+4, 6.5536000000e+4
 };
+#else
+static const scalar spectrumScale[32] = {                      /* Q15 */
+    0x00000001, 0x00000002, 0x00000004, 0x00000008, 0x00000010, 0x00000020, 0x00000040, 0x00000080, 
+    0x00000100, 0x00000200, 0x00000400, 0x00000800, 0x00001000, 0x00002000, 0x00004000, 0x00008000, 
+    0x00010000, 0x00020000, 0x00040000, 0x00080000, 0x00100000, 0x00200000, 0x00400000, 0x00800000, 
+    0x01000000, 0x02000000, 0x04000000, 0x08000000, 0x10000000, 0x20000000, 0x40000000, 0x7fffffff, 
+};
+#endif
 
+
+#ifndef FIXEDPOINT
 void scaleSpectrum(channel_t* this)
 {
     const frame_t *frame = this->frame;
 	const int quantUnitCount = frame->quantizationUnitCount;
-	float  * const spectra = this->spectra;
+  	scalar *const spectra = this->spectra;
 
 	for (int i = 0; i < quantUnitCount; i++)
 	{
@@ -208,7 +271,7 @@ void scaleSpectrum(channel_t* this)
         {
 	       for (int sb = startSubBand; sb < endSubBand; sb++)
 		   {
-		        spectra[sb] *= spectrumScale[this->scaleFactors[i]];
+                spectra[sb] = spectra[sb] * spectrumScale[this->scaleFactors[i]];
 		   }
         } 
 	}
@@ -216,4 +279,26 @@ void scaleSpectrum(channel_t* this)
     LOG_ARRAY_LEN( this->spectra, "%e, ", ga_isp_ldac[frame->quantizationUnitCount-1] + ga_nsps_ldac[frame->quantizationUnitCount-1] );
 }
 
+#else
+void scaleSpectrum(channel_t* this)
+{    
+    const frame_t *frame = this->frame;
+	const int quantUnitCount = frame->quantizationUnitCount;
+	int *const spectra = this->spectra;
 
+	for (int i = 0; i < quantUnitCount; i++)
+	{
+        const int startSubBand = ga_isp_ldac[i];
+        const int endSubBand   = ga_isp_ldac[i+1];
+        if( this->scaleFactors[i] > 0 )
+        {
+	       for (int sb = startSubBand; sb < endSubBand; sb++)
+		   {
+		        spectra[sb] = mul_rsftrnd_ldac(spectra[sb], spectrumScale[this->scaleFactors[i]], 30);
+		   }
+        } 
+	}
+    //TODO: Check the range here too
+    LOG_ARRAY_LEN( this->spectra, "%e, ", ga_isp_ldac[frame->quantizationUnitCount-1] + ga_nsps_ldac[frame->quantizationUnitCount-1] );
+}
+#endif
