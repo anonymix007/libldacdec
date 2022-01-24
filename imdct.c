@@ -181,10 +181,10 @@ void RunImdct(Mdct* mdct, scalar* input, scalar* output)
 	
     for (int i = 0; i < half; i++)
 	{
-		output[i] = mul_rsftrnd_ldac(window[i], dctOut[i + half], 31) + previous[i];
-		output[i + half] = mul_rsftrnd_ldac(window[i + half], -dctOut[size - 1 - i], 31) - previous[i + half];
-		previous[i] = mul_rsftrnd_ldac(window[size - 1 - i], -dctOut[half - i - 1], 31);
-		previous[i + half] = mul_rsftrnd_ldac(window[half - i - 1], dctOut[i], 31);
+		output[i] = mul_rsftrnd_ldac(window[i], dctOut[i + half], 30) + previous[i];
+		output[i + half] = mul_rsftrnd_ldac(window[i + half], -dctOut[size - 1 - i], 30) - previous[i + half];
+		previous[i] = mul_rsftrnd_ldac(window[size - 1 - i], -dctOut[half - i - 1], 30);
+		previous[i + half] = mul_rsftrnd_ldac(window[half - i - 1], dctOut[i], 30);
     }
 }
 

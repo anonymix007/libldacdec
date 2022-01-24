@@ -294,7 +294,7 @@ void scaleSpectrum(channel_t* this)
         {
 	       for (int sb = startSubBand; sb < endSubBand; sb++)
 		   {
-		        spectra[sb] = mul_rsftrnd_ldac(spectra[sb], spectrumScale[this->scaleFactors[i]], 30);
+		        spectra[sb] = mul_rsftrnd_ldac(spectra[sb], spectrumScale[this->scaleFactors[i]], 31);
 		   }
         } 
 	}

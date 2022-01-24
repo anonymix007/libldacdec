@@ -27,7 +27,7 @@ all: libldacdec.so ldacdec ldacenc
 
 libldacdec.so: LDFLAGS += -shared -fpic -Wl,-soname,libldacdec.so.1
 libldacdec.so: CFLAGS += -fpic
-libldacdec.so: fixp_func.o libldacdec.o bit_allocation.o huffCodes.o bit_reader.o utility.o imdct.o spectrum.o
+libldacdec.so: libldacdec.o bit_allocation.o huffCodes.o bit_reader.o utility.o imdct.o spectrum.o
 
 ldacenc: ldacenc.o ldaclib.o ldacBT.o
 
