@@ -169,6 +169,9 @@ static void Dct4(Mdct* mdct, scalar* input, scalar* output)
 }
 #else
 
+
+#define WINDOW_SHIFT 29
+
 void RunImdct(Mdct* mdct, scalar* input, scalar* output)
 {
 	const int size = 1 << mdct->Bits;
@@ -181,10 +184,10 @@ void RunImdct(Mdct* mdct, scalar* input, scalar* output)
 	
     for (int i = 0; i < half; i++)
 	{
-		output[i] = mul_rsftrnd_ldac(window[i], dctOut[i + half], 30) + previous[i];
-		output[i + half] = mul_rsftrnd_ldac(window[i + half], -dctOut[size - 1 - i], 30) - previous[i + half];
-		previous[i] = mul_rsftrnd_ldac(window[size - 1 - i], -dctOut[half - i - 1], 30);
-		previous[i + half] = mul_rsftrnd_ldac(window[half - i - 1], dctOut[i], 30);
+		output[i] = mul_rsftrnd_ldac(window[i], dctOut[i + half], WINDOW_SHIFT) + previous[i];
+		output[i + half] = mul_rsftrnd_ldac(window[i + half], -dctOut[size - 1 - i], WINDOW_SHIFT) - previous[i + half];
+		previous[i] = mul_rsftrnd_ldac(window[size - 1 - i], -dctOut[half - i - 1], WINDOW_SHIFT);
+		previous[i + half] = mul_rsftrnd_ldac(window[half - i - 1], dctOut[i], WINDOW_SHIFT);
     }
 }
 

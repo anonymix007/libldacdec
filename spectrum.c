@@ -290,7 +290,7 @@ void scaleSpectrum(channel_t* this)
 	{
         const int startSubBand = ga_isp_ldac[i];
         const int endSubBand   = ga_isp_ldac[i+1];
-        if( this->scaleFactors[i] > 0 )
+        //if( this->scaleFactors[i] > 0 ) // TODO: Maybe it's better to shift left by 16 in case of 0 instead
         {
 	       for (int sb = startSubBand; sb < endSubBand; sb++)
 		   {

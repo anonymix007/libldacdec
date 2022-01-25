@@ -13,7 +13,7 @@ CFLAGS += -Ilibldac/inc -Ilibldac/src
 #CFLAGS += -DDEBUG
 #CFLAGS += -DDEBUG_ADAPTATION
 CFLAGS += -DFIXEDPOINT
-LDLIBS = -lm -lfftw3f
+LDLIBS = -lm
 
 ifeq ($(ASAN),true)
 LCFLAGS += -fsanitize=address
