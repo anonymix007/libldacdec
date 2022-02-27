@@ -5,6 +5,9 @@ this is an early stage, jet functional LDAC audio stream decoder.
 Shout-out to [@Thealexbarney](https://github.com/Thealexbarney) for the heavy lifting.
 LDAC is basically a stripped down, streaming only ATRAC9.
 
+### License
+This branch contains modifications to support platforms without FPU. While the [ATRAC9 decoder library](https://github.com/Thealexbarney/LibAtrac9) was originally distributed under the terms of MIT license (see the [license file in LibAtrac9 repo](https://raw.githubusercontent.com/Thealexbarney/LibAtrac9/master/LICENSE) for permissions), fixed-point patches are GPLv3+, so library as a whole is GPLv3+.
+
 #### Build
 ```sh
 sudo apt install libsndfile1 libsndfile1-dev libsamplerate0 libsamplerate0-dev
