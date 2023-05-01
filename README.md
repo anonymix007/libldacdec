@@ -43,6 +43,24 @@ sudo make install
 ```
 
 #### Building for Raspberry Pi
+
+Apply the following patch to your kernel
+```diff
+diff --git a/net/bluetooth/l2cap_sock.c b/net/bluetooth/l2cap_sock.c
+index eebe25610..64db1db3f 100644
+--- a/net/bluetooth/l2cap_sock.c
++++ b/net/bluetooth/l2cap_sock.c
+@@ -1825,7 +1825,7 @@ static void l2cap_sock_init(struct sock *sk, struct sock *parent)
+                        break;
+                }
+ 
+-               chan->imtu = L2CAP_DEFAULT_MTU;
++               chan->imtu = 0;
+                chan->omtu = 0;
+                if (!disable_ertm && sk->sk_type == SOCK_STREAM) {
+                        chan->mode = L2CAP_MODE_ERTM;
+```
+Run the following script to automatically build and install bluez-alsa with LDAC decoding capabilities:
 ```sh
 #!/bin/sh
 
