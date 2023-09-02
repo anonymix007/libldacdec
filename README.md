@@ -60,6 +60,19 @@ index eebe25610..64db1db3f 100644
                 if (!disable_ertm && sk->sk_type == SOCK_STREAM) {
                         chan->mode = L2CAP_MODE_ERTM;
 ```
+
+If you're running a Debian-based system, you can also run [this script](https://github.com/anonymix007/libldacdec/blob/master/patch-kernel.sh)
+to patch and build the kernel, with this command:
+```sh
+# If you have cloned the repository
+./patch-kernel.sh --install
+
+# If you havent't cloned the repository
+curl https://raw.githubusercontent.com/anonymix007/libldacdec/master/patch-kernel.sh | bash -s -- --install
+```
+If you want to add additional configurations to the kernel, you can pass `--configure`.
+If you don't want to install the kernel, but you just want to compile it, you can remove `--install` from the command.
+
 Run the following script to automatically build and install bluez-alsa with LDAC decoding capabilities:
 ```sh
 #!/bin/sh
