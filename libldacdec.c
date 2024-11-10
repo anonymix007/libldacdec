@@ -119,9 +119,9 @@ int ldacdecInit( ldacdec_t *this )
     InitHuffmanCodebooks();
     InitMdct();
 
-    memset( &this->frame.channels[0].mdct, 0, sizeof( Mdct ) ); 
+    memset( &this->frame.channels[0].mdct, 0, sizeof( Mdct ) );
     memset( &this->frame.channels[1].mdct, 0, sizeof( Mdct ) );
-    
+
     this->frame.channels[0].frame = &this->frame;
     this->frame.channels[1].frame = &this->frame;
 
@@ -147,8 +147,8 @@ static int decodeGradient( frame_t *this, BitReaderCxt *br )
         this->gradientEndUnit    = ReadInt( br, LDAC_GRADQU0BITS ) + 1;
         this->gradientStartValue = ReadInt( br, LDAC_GRADOSBITS );
         this->gradientEndValue   = ReadInt( br, LDAC_GRADOSBITS );
-        LOG("gradient\n\tqu [%3d,%3d]\n\tvalue [%3d,%3d]\n", 
-                this->gradientStartUnit, this->gradientEndUnit, 
+        LOG("gradient\n\tqu [%3d,%3d]\n\tvalue [%3d,%3d]\n",
+                this->gradientStartUnit, this->gradientEndUnit,
                 this->gradientStartValue, this->gradientEndValue );
     } else
     {
@@ -156,11 +156,11 @@ static int decodeGradient( frame_t *this, BitReaderCxt *br )
         this->gradientEndUnit    = 26;
         this->gradientStartValue = ReadInt( br, LDAC_GRADOSBITS );
         this->gradientEndValue   = 31;
-        LOG("gradient\n\tqu [%3d,%3d\n\tvalue [%3d,%3d]\n", 
-                this->gradientStartUnit, this->gradientEndUnit, 
+        LOG("gradient\n\tqu [%3d,%3d\n\tvalue [%3d,%3d]\n",
+                this->gradientStartUnit, this->gradientEndUnit,
                 this->gradientStartValue, this->gradientEndValue );
     }
-    
+
     this->gradientBoundary = ReadInt( br, LDAC_NADJQUBITS );
     return 0;
 }
@@ -169,7 +169,7 @@ static void calculateGradient( frame_t *this )
 {
     int valueCount = this->gradientEndValue - this->gradientStartValue;
     int unitCount = this->gradientEndUnit - this->gradientStartUnit;
-    
+
     memset( this->gradient, 0, sizeof( this->gradient ) );
 
     for( int i=0; i<this->gradientEndUnit; ++i )
@@ -194,7 +194,7 @@ static void calculateGradient( frame_t *this )
             }
         }
     }
-    
+
     LOG_ARRAY_LEN( this->gradient, "%3d, ", this->quantizationUnitCount );
 }
 
@@ -219,7 +219,7 @@ static void calculatePrecisionMask(channel_t* this)
 static void calculatePrecisions( channel_t *this )
 {
     frame_t *frame = this->frame;
-    
+
     for( int i=0; i<frame->quantizationUnitCount; ++i )
     {
         switch( frame->gradientMode )
@@ -264,7 +264,7 @@ static void calculatePrecisions( channel_t *this )
                 break;
         }
     }
-    
+
     for( int i=0; i<frame->gradientBoundary; ++i )
     {
         this->precisions[i]++;
@@ -304,7 +304,7 @@ static int decodeScaleFactor0( channel_t *this, BitReaderCxt *br )
     for( int i=1; i<frame->quantizationUnitCount; ++i )
     {
         int diff = ReadHuffmanValue( codebook, br, 1 );
-       
+
 //        printf("%2d, ", diff );
         this->scaleFactors[i] = (this->scaleFactors[i-1] + diff) & mask;
         this->scaleFactors[i-1] += this->scaleFactorOffset - weightTable[i-1]; // cancel weights
@@ -320,7 +320,7 @@ static int decodeScaleFactor1( channel_t *this, BitReaderCxt *br )
     LOG_FUNCTION();
     frame_t *frame = this->frame;
     this->scaleFactorBitlen = ReadInt( br, LDAC_SFCBLENBITS ) + LDAC_MINSFCBLEN_1;
-    
+
     if( this->scaleFactorBitlen > 4 )
     {
         for( int i=0; i<frame->quantizationUnitCount; ++i )
@@ -356,7 +356,7 @@ int decodeScaleFactor2( channel_t *this, BitReaderCxt *br )
 //       printf("%2d, ", diff );
        this->scaleFactors[i] = other->scaleFactors[i] + diff;
     }
-    
+
     LOG_ARRAY_LEN( this->scaleFactors, "%2d, ", frame->quantizationUnitCount );
     return 0;
 }
@@ -427,7 +427,7 @@ static void pcmFloatToInt( frame_t *this, int32_t *pcmOut )
     {
         for( int ch=0; ch<this->channelCount; ++ch, ++i )
         {
-            pcmOut[i] = Round(this->channels[ch].pcm[smpl]*(1<<15));
+            pcmOut[i] = Round(this->channels[ch].pcm[smpl]*(1<<16));
         }
     }
 }
@@ -452,9 +452,9 @@ int ldacdecGetSampleRate( ldacdec_t *this )
 static int decodeFrame( frame_t *this, BitReaderCxt *br )
 {
     int syncWord = ReadInt( br, LDAC_SYNCWORDBITS );
-    
+
     LOG_ADAPT("syncWord: %x, ", syncWord);
-    
+
     if( syncWord != LDAC_SYNCWORD )
         return -1;
 
@@ -462,7 +462,7 @@ static int decodeFrame( frame_t *this, BitReaderCxt *br )
     this->channelConfigId = ReadInt( br, LDAC_CHCONFIG2BITS );
     this->frameLength = ReadInt( br, LDAC_FRAMELEN2BITS ) + 1;
     this->frameStatus = ReadInt( br, LDAC_FRAMESTATBITS );
-    
+
     this->channelCount = channelConfigIdToChannelCount[this->channelConfigId];
     this->frameSamplesPower = sampleRateIdToSamplesPower[this->sampleRateId];
     this->frameSamples = 1<<this->frameSamplesPower;
@@ -487,22 +487,22 @@ int ldacDecode( ldacdec_t *this, uint8_t *stream, short *pcm, int *bytesUsed )
     InitBitReaderCxt( br, stream );
 
     frame_t *frame = &this->frame;
-   
+
     int ret = decodeFrame( frame, br );
     if( ret < 0 )
         return -1;
-   
+
     for( int block = 0; block<gaa_block_setting_ldac[frame->channelConfigId][1]; ++block )
     {
         decodeBand( frame, br );
         decodeGradient( frame, br );
         calculateGradient( frame );
-        
+
         for( int i=0; i<frame->channelCount; ++i )
         {
             channel_t *channel = &frame->channels[i];
             decodeScaleFactors( frame, br, i );
-            calculatePrecisionMask( channel ); 
+            calculatePrecisionMask( channel );
             calculatePrecisions( channel );
 
             decodeSpectrum( channel, br );
@@ -530,22 +530,22 @@ int ldacDecode_type( ldacdec_t *this, uint8_t *stream, void *pcm, int *bytesUsed
     InitBitReaderCxt( br, stream );
 
     frame_t *frame = &this->frame;
-   
+
     int ret = decodeFrame( frame, br );
     if( ret < 0 )
         return -1;
-   
+
     for( int block = 0; block<gaa_block_setting_ldac[frame->channelConfigId][1]; ++block )
     {
         decodeBand( frame, br );
         decodeGradient( frame, br );
         calculateGradient( frame );
-        
+
         for( int i=0; i<frame->channelCount; ++i )
         {
             channel_t *channel = &frame->channels[i];
             decodeScaleFactors( frame, br, i );
-            calculatePrecisionMask( channel ); 
+            calculatePrecisionMask( channel );
             calculatePrecisions( channel );
 
             decodeSpectrum( channel, br );
@@ -569,7 +569,7 @@ int ldacDecode_type( ldacdec_t *this, uint8_t *stream, void *pcm, int *bytesUsed
                 break;
             default: return 666;
         }
-        
+
     }
     AlignPosition( br, (frame->frameLength)*8 + 24 );
 
@@ -619,19 +619,19 @@ HANDLE_LDAC_BT ldacBT_get_handle(void)
 {
     HANDLE_LDAC_BT hLdacBT;
 
-    hLdacBT = (HANDLE_LDAC_BT)malloc(sizeof(_st_ldacbt_handle));
+    hLdacBT = (HANDLE_LDAC_BT)calloc(1, sizeof(_st_ldacbt_handle));
     if( hLdacBT == NULL )return NULL;
-    
-    ldacdec_t *dec = malloc(sizeof(ldacdec_t));
-    
-    /* Get ldaclib Handler */
+
+    ldacdec_t *dec = calloc(1, sizeof(ldacdec_t));
+
+    /* Get ldaclib Handle */
     if((hLdacBT->hLDAC = (HANDLE_LDAC)dec) == NULL){
         free(hLdacBT);
         return NULL;
     }
 
     hLdacBT->proc_mode = LDACBT_PROCMODE_DECODE;
-    
+
     return hLdacBT;
 }
 
@@ -642,7 +642,13 @@ int ldacBT_init_handle_decode(HANDLE_LDAC_BT hLdacBT, int cm, int sf, int nshift
     (void)var1;
     (void)var2;
 
-    if(hLdacBT->proc_mode != LDACBT_PROCMODE_DECODE) return 1000;
+    if(hLdacBT->proc_mode != LDACBT_PROCMODE_DECODE) {
+        free(hLdacBT->hLDAC);
+        hLdacBT->proc_mode = LDACBT_PROCMODE_DECODE;
+        ldacdec_t *dec = calloc(1, sizeof(ldacdec_t));
+        assert(dec != NULL);
+        hLdacBT->hLDAC = (HANDLE_LDAC)dec;
+    }
 
     return ldacdecInit((ldacdec_t *)hLdacBT->hLDAC);
 }
@@ -650,19 +656,19 @@ int ldacBT_init_handle_decode(HANDLE_LDAC_BT hLdacBT, int cm, int sf, int nshift
 int ldacBT_decode(HANDLE_LDAC_BT hLdacBT, uchar *p_stream, void *p_pcm, LDACBT_SMPL_FMT_T fmt, int stream_sz, int *used_bytes, int *pcm_sz){
     (void)stream_sz;
     ldacdec_t *dec = (ldacdec_t *)hLdacBT->hLDAC;
-    
-    LOG_ADAPT("LIBLDACDEC: format: %d, ", fmt);
-    
+
+    LOG_ADAPT("libldacdec: format: %d\n", fmt);
+
     if(fmt != LDACBT_SMPL_FMT_S16 && fmt != LDACBT_SMPL_FMT_S32 && fmt != LDACBT_SMPL_FMT_F32) return hLdacBT->error_code_api=517;
-    
+
     if(hLdacBT->proc_mode != LDACBT_PROCMODE_DECODE) return hLdacBT->error_code_api=1000;
 
-    int result = ldacDecode_type(dec, p_stream, p_pcm, used_bytes, fmt); 
-    
+    int result = ldacDecode_type(dec, p_stream, p_pcm, used_bytes, fmt);
+
     *pcm_sz = dec->frame.frameSamples * (fmt < 4 ? fmt*2 : 4*2);
-    LOG_ADAPT("result: %d, pcm_sz: %d, stream_sz: %d, used_bytes: %d\r", result, *pcm_sz, stream_sz, *used_bytes);
+    LOG_ADAPT("libldacdec: result: %d, pcm_sz: %d, stream_sz: %d, used_bytes: %d\n", result, *pcm_sz, stream_sz, *used_bytes);
     if(result == -1) return hLdacBT->error_code_api=516;
-    
+
 
     return  hLdacBT->error_code_api=result;
 }
