@@ -1,9 +1,11 @@
 #!/bin/bash
 
-MORE=1
+MORE=0
 INSTALL=0
 RUN_MENUCONFIG=0
-WORKDIR="$HOME/bt-kernel-patch"
+DEB_BUILD=1
+WORKDIR="$HOME/bluetooth/kernel-patch"
+PATCH="$PWD/kernel.patch"
 
 if [[ "$@" == *"--install"* ]]; then
     INSTALL=1
@@ -28,7 +30,7 @@ if ! grep -q "^deb-src" /etc/apt/sources.list /etc/apt/sources.list.d/*; then
     exit 1
 fi
 
-if [[ $MORE > 1 ]]; then
+if [[ "$MORE" -gt 1 ]]; then
     echo " - Warning: You set \$MORE to $MORE, which is greater than 1, and this is unsafe. I recommend you to set it to 0 or 1." 1>&2
 fi
 
@@ -43,6 +45,27 @@ abort() {
 run() {
     echo " - Running $*" 1>&2
     $*
+}
+
+backup() {
+    dest="$1"
+    if [[ $2 == 1 ]]; then
+        maybe_sudo="sudo"
+    else
+        maybe_sudo=""
+    fi
+
+    if [[ ! -e "$dest" ]]; then return 1; fi
+
+    if [ -e "$dest.old" ]; then
+        counter=1
+        while [ -e "$dest.old.$counter" ]; do
+            counter=$((counter + 1))
+        done
+        $maybe_sudo mv "$dest" "$dest.old.$counter"
+    else
+        $maybe_sudo mv "$dest" "$dest.old"
+    fi
 }
 
 copy_with_backup() {
@@ -60,15 +83,7 @@ copy_with_backup() {
     fi
 
     if [ -e "$dest" ]; then
-        if [ -e "$dest.old" ]; then
-            counter=1
-            while [ -e "$dest.old.$counter" ]; do
-                counter=$((counter + 1))
-            done
-            $maybe_sudo mv "$dest" "$dest.old.$counter"
-        else
-            $maybe_sudo mv "$dest" "$dest.old"
-        fi
+        backup "$dest" $3
     fi
 
     $maybe_sudo cp "$source" "$dest"
@@ -97,7 +112,7 @@ if [ -f /proc/device-tree/model ]; then
         *)
             if [ -f "/proc/cpuinfo" ]; then
                 tempconfig=$(cat /proc/cpuinfo | grep "Hardware" | awk '{print tolower($3)}')
-                if [ -n $tempconfig ]; then
+                if [ -n "$tempconfig" ]; then
                     defconfig=$tempconfig
                 else
                     defconfig=$(uname -m)
@@ -114,54 +129,34 @@ else
     generic_defconfig=1
 fi
 
-if [ -e $WORKDIR ]; then
-    rm -r $WORKDIR
+if [ -e "$WORKDIR" ]; then
+    rm -r "$WORKDIR"
 fi
 
-mkdir $WORKDIR
-cd $WORKDIR
+mkdir "$WORKDIR" || abort
+cd "$WORKDIR" || abort
 
 echo " - Preparing the system to compile the kernel..."
 sudo apt update
-sudo apt install build-essential libncurses-dev bison flex libssl-dev xz-utils libelf-dev fakeroot patch || abort
+sudo apt install build-essential libncurses-dev bison flex libssl-dev xz-utils libelf-dev fakeroot patch devscripts || abort
 
 MAKE="make -j$JOBS"
 
 echo " - Downloading the kernel source package..."
-if [[ $is_pi == 1 ]]; then
-    apt source raspberrypi-firmware || abort
-    cd raspberrypi-firmware-*/linux
-else
-    apt source linux-source || abort
-    cd linux-*
+apt source linux || abort
+
+if [[ "$DEB_BUILD" != 1 ]]; then
+    if [[ "$generic_defconfig" == 1 ]]; then
+        echo " - Warning: Couldn't get information for defconfig. Falling back to the generic defconfig." 1>&2
+    fi
+
+    echo " - Defconfig: $defconfig"
 fi
 
+cd linux-*
 
-if [[ $generic_defconfig == 1 ]]; then
-    echo " - Warning: Couldn't get information for defconfig. Falling back to the generic defconfig." 1>&2
-fi
-
-echo " - Defconfig: $defconfig"
-
-PATCH=$(cat <<EOF
-diff --git a/net/bluetooth/l2cap_sock.c b/net/bluetooth/l2cap_sock.c
-index eebe25610..64db1db3f 100644
---- a/net/bluetooth/l2cap_sock.c
-+++ b/net/bluetooth/l2cap_sock.c
-@@ -1825,7 +1825,7 @@ static void l2cap_sock_init(struct sock *sk, struct sock *parent)
-                        break;
-                }
- 
--               chan->imtu = L2CAP_DEFAULT_MTU;
-+               chan->imtu = 0;
-                chan->omtu = 0;
-                if (!disable_ertm && sk->sk_type == SOCK_STREAM) {
-                        chan->mode = L2CAP_MODE_ERTM;
-EOF
-)
-
-if echo $PATCH | patch -sfp0 --ignore-whitespace --dry-run net/bluetooth/l2cap_sock.c &>/dev/null; then
-    if echo $PATCH | patch -s --ignore-whitespace net/bluetooth/l2cap_sock.c &>/dev/null; then
+if patch -sfp0 --ignore-whitespace --dry-run net/bluetooth/l2cap_sock.c < "$PATCH" &>/dev/null; then
+    if patch -s --ignore-whitespace net/bluetooth/l2cap_sock.c < "$PATCH" &>/dev/null; then
         echo " - Applied patch to net/bluetooth/l2cap_sock.c."
     else
         echo " - Could not apply patch to net/bluetooth/l2cap_sock.c. Aborting." 1>&2
@@ -171,25 +166,27 @@ else
     echo " - Patch already applied."
 fi
 
-run $MAKE clean
-run $MAKE mrproper
-run $MAKE ${defconfig}_defconfig || run $MAKE defconfig
-if [[ $RUN_MENUCONFIG == 1 ]]; then
-    run $MAKE menuconfig
+if [[ "$DEB_BUILD" == 1 ]]; then
+    export DEB_BUILD_OPTIONS="parallel=$JOBS"
+    export DEB_BUILD_PROFILES="nodoc"
+    run fakeroot debian/rules binary -j$JOBS || abort
+else
+    run $MAKE clean
+    run $MAKE mrproper
+    run $MAKE ${defconfig}_defconfig || run $MAKE defconfig
+    if [[ "$RUN_MENUCONFIG" == 1 ]]; then
+        run $MAKE menuconfig
+    fi
+    if [[ "$is_pi" == 1 ]]; then
+        run $MAKE Image.gz modules dtbs || abort
+    else
+        run $MAKE || abort
+    fi
 fi
 
-run $MAKE || abort
-
-if [[ $is_pi == 1 ]]; then
-    cd ..
-    run fakeroot debian/rules -j$JOBS binary || abort
-    cd -
-fi
-
-
-if [[ -e "/boot/kernel8.img" ]]; then
+if [[ -e "/boot/firmware/kernel8.img" ]]; then
     kn=8
-else if [[ -e "/boot/kernel7.img" ]]; then
+elif [[ -e "/boot/firmware/kernel7.img" ]]; then
     kn=7
 fi
 
@@ -200,26 +197,38 @@ case $(uname -m) in
     *) arch="<INSERT_ARCH_HERE>" ;;
 esac
 
-if [[ $INSTALL == 1 ]]; then
-    if [[ $is_pi == 1 ]]; then
-        run sudo dpkg -i ../../*.deb || abort
-        if [[ arch == "<INSERT_ARCH_HERE>" ]]; then
-            echo " - Error: Could not detect the architecture ($(uname -m)) - you have to copy the image to /boot yourself." 1>&2
-            exit 1
-        fi
-
-        echo -n " - Copying the Linux image to /boot..."
-        copy_with_backup arch/$arch/boot/Image /boot/kernel$kn.img 1 || abort
-        echo "done.\n - To restore the original kernel, copy /boot/kernel$kn.img.old back to /boot/kernel$kn.img"
+if [[ "$INSTALL" == 1 ]]; then
+    if [[ "$DEB_BUILD" == 1 ]]; then
+        run sudo dpkg -i ../*.deb || abort
     else
-        run sudo $MAKE install || abort
+        run sudo $MAKE modules_install || abort
+        if [[ "$is_pi" == 1 ]]; then
+            if [[ "$arch" == "<INSERT_ARCH_HERE>" ]]; then
+                echo " - Error: Could not detect the architecture ($(uname -m)) - you have to copy the image to /boot yourself." 1>&2
+                exit 1
+            fi
+
+            echo -n " - Copying the Linux image to /boot..."
+            copy_with_backup arch/$arch/boot/Image /boot/firmware/kernel$kn.img 1 || abort
+            backup /boot/firmware/overlays 1
+            run sudo mkdir /boot/firmware/overlays
+            run sudo cp arch/arm64/boot/dts/broadcom/*.dtb /boot/firmware/
+            run sudo cp arch/arm64/boot/dts/overlays/*.dtb* /boot/firmware/overlays/
+            run sudo cp arch/arm64/boot/dts/overlays/README /boot/firmware/overlays/
+            echo "done.\n - To restore the original kernel, copy /boot/firmware/kernel$kn.img.old back to /boot/firmware/kernel$kn.img"
+        else
+            run sudo $MAKE install || abort
+        fi
     fi
     echo " - Done, the patched kernel has been successfully installed!"
     echo " - Reboot to run the new kernel."
 else
     echo -n " - Successfully built the patched kernel. To install it, just "
-    if [[ $is_pi == 1 ]]; then
-        echo "copy $(readlink -f arch/$arch/boot/Image) to /boot/kernel$kn.img."
+    if [[ "$DEB_BUILD" == 1 ]]; then
+        echo "install the .deb packages inside the $WORKDIR directory:"
+        echo " - sudo apt install $WORKDIR/*.deb"
+    elif [[ "$is_pi" == 1 ]]; then
+        echo "copy $(readlink -f arch/$arch/boot/Image) to /boot/firmware/kernel$kn.img."
     else
         echo "run \"sudo $MAKE install\" inside the directory $WORKDIR."
     fi
