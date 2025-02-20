@@ -427,7 +427,7 @@ static void pcmFloatToInt( frame_t *this, int32_t *pcmOut )
     {
         for( int ch=0; ch<this->channelCount; ++ch, ++i )
         {
-            pcmOut[i] = Round(this->channels[ch].pcm[smpl]*(1<<16));
+            pcmOut[i] = Round(this->channels[ch].pcm[smpl]*(1<<15));
         }
     }
 }
