@@ -27,11 +27,12 @@ fi
 
 if ! grep -q "^deb-src" /etc/apt/sources.list /etc/apt/sources.list.d/*; then
     echo " - Error: Source repositories are disabled or not configured in your /etc/apt/sources.list. You need to enable them for this script to work." 1>&2
+    echo " - Note:  If you're compiling for a Raspberry Pi, you also need to enable source repositories in /etc/apt/sources.list.d/raspi.conf." 1>&2
     exit 1
 fi
 
 if [[ "$MORE" -gt 1 ]]; then
-    echo " - Warning: You set \$MORE to $MORE, which is greater than 1, and this is unsafe. I recommend you to set it to 0 or 1." 1>&2
+    echo " - Warning: You set \$MORE to $MORE, which is greater than 1, and this may slow down the build. I recommend you to set it to 0 or 1." 1>&2
 fi
 
 
@@ -133,7 +134,7 @@ if [ -e "$WORKDIR" ]; then
     rm -r "$WORKDIR"
 fi
 
-mkdir "$WORKDIR" || abort
+mkdir -p "$WORKDIR" || abort
 cd "$WORKDIR" || abort
 
 echo " - Preparing the system to compile the kernel..."
@@ -158,16 +159,16 @@ cd linux-*
 if [[ "$DEB_BUILD" == 1 ]]; then
 	out=$(dpkg-checkbuilddeps 2>&1 >/dev/null || true)
 
-	if [[ ! -z "$output" ]]; then
+	if [[ ! -z "$out" ]]; then
 		depln=$(echo "$out" | sed -n 's/.*Unmet build dependencies: //p')
 
-		if [[ ! -z "$deps_line" ]]; then
+		if [[ ! -z "$depln" ]]; then
 			deps=$(echo "$depln" \
 			  | sed -E 's/\([^)]*\)//g' \
 			  | sed -E 's/([[:alnum:]._:+-]+)\s*\|\s*[[:alnum:]._:+-]+/\1/g')
 
 			echo " - Installing missing build dependencies."
-			sudo apt install -y $deps_clean
+			sudo apt install -y $deps
 		fi
 	fi
 fi
