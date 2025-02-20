@@ -155,6 +155,23 @@ fi
 
 cd linux-*
 
+if [[ "$DEB_BUILD" == 1 ]]; then
+	out=$(dpkg-checkbuilddeps 2>&1 >/dev/null || true)
+
+	if [[ ! -z "$output" ]]; then
+		depln=$(echo "$out" | sed -n 's/.*Unmet build dependencies: //p')
+
+		if [[ ! -z "$deps_line" ]]; then
+			deps=$(echo "$depln" \
+			  | sed -E 's/\([^)]*\)//g' \
+			  | sed -E 's/([[:alnum:]._:+-]+)\s*\|\s*[[:alnum:]._:+-]+/\1/g')
+
+			echo " - Installing missing build dependencies."
+			sudo apt install -y $deps_clean
+		fi
+	fi
+fi
+
 if patch -sfp0 --ignore-whitespace --dry-run net/bluetooth/l2cap_sock.c < "$PATCH" &>/dev/null; then
     if patch -s --ignore-whitespace net/bluetooth/l2cap_sock.c < "$PATCH" &>/dev/null; then
         echo " - Applied patch to net/bluetooth/l2cap_sock.c."
